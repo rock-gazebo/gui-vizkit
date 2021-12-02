@@ -47,17 +47,16 @@ Vizkit::UiLoader::extend_cplusplus_widget_class "Plot2d" do
         options
     end
 
-    def time 
-        time = if @log_replay
-                   @log_replay.time
-               else
-                   Time.now
-               end
-        @time ||= time 
-        time
+    def time
+        if @log_replay
+            @log_replay.time
+        else
+            Time.now
+        end
     end
 
     def setXTitle(value)
+        @x_label = value.to_s
         getXAxis.setLabel(value.to_s)
     end
 
@@ -74,26 +73,31 @@ Vizkit::UiLoader::extend_cplusplus_widget_class "Plot2d" do
     def initialize_vizkit_extension
         @options = default_options
         @graphs = Hash.new
-        @time = nil 
         @timer = Qt::Timer.new
         @needs_update = false
-        @timer.connect(SIGNAL"timeout()") do 
-            replot if @needs_update
-            @needs_update = false
+        @timer.connect(SIGNAL(:timeout)) do
+            if @needs_update
+                if live? && @latency
+                    getXAxis.setLabel("#{@x_label} (latency: #{@latency})")
+                end
+
+                replot
+                @needs_update = false
+            end
         end
         @timer.start(1000*@options[:update_period])
         @color_next_idx = 0
-        
+
         getLegend.setVisible(true)
-        getXAxis.setLabel("Time in sec")
-        setTitle("Rock-Plot2d")
-        
+        setTitle("Rock Plot2d")
+        setXTitle("Time in sec")
+
         @preferences = Vizkit::Plot2d::Preferences.new('vizkit', 'plot2d', default_opts: @options)
         @preferences.connect(SIGNAL('updated()')) do
             update_options
         end
         update_options
-        
+
         self.connect(SIGNAL('mousePressOnPlotArea(QMouseEvent*)')) do |event|
             if event.button() == Qt::RightButton
                 #show pop up menue
@@ -271,12 +275,20 @@ Vizkit::UiLoader::extend_cplusplus_widget_class "Plot2d" do
         end
     end
 
-    def config(value,options)
-        @log_replay = if value.respond_to? :task
-                          if value.task.respond_to? :log_replay
-                              value.task.log_replay
-                          end
-                      end
+    def live?
+        @live
+    end
+
+    def config(value, options)
+        @log_replay =
+            if value.respond_to? :task
+                if value.task.respond_to? :log_replay
+                    value.task.log_replay
+                end
+            end
+
+        @live = options[:live] || !@log_replay
+
         @options = options.merge(@options)
         if value.type_name == "/base/samples/SonarBeam"
             if !@graphs.empty?
@@ -348,8 +360,8 @@ Vizkit::UiLoader::extend_cplusplus_widget_class "Plot2d" do
     # @param [Time] time the sample time
     def update(sample, name, time: self.time)
         graph = graph2(name)
-        @time ||= time
-        x = time-@time
+        x = Vizkit.make_time_relative(time)
+        @latency = Time.now - time
 
         graph.removeDataBefore(x - @options[:cached_time_window])
         graph.addData(x, sample.to_f)
