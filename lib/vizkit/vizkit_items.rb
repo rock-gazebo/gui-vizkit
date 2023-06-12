@@ -43,26 +43,32 @@ module Vizkit
             @childs = []
         end
 
-        def collapse(propagated = false)
-            @expanded = false
-            each_child do |item|
-                item.collapse(true)
-            end
+        def modified?
+            !!@modified
         end
 
         def expanded?
             @expanded
         end
 
-        def expand(propagated = false)
+        def expanded
             @expanded = true
-            each_child do |item|
-                item.expand(true)
+            each_child do |child|
+                child.expanded if child.expanded?
             end
         end
 
-        def modified?
-            !!@modified
+        def collapsed
+            @expanded = false
+            each_child(&:stop)
+        end
+
+        def start
+            each_child(&:start)
+        end
+
+        def stop
+            each_child(&:stop)
         end
 
         def each_child(columns = nil,&block)
@@ -79,7 +85,7 @@ module Vizkit
         def enabled(value=true)
             setEnabled(value)
             each_child do |item|
-                item.enabled(value)
+                item.enabled(value) if item.respond_to?(:enabled)
             end
         end
 
@@ -539,12 +545,13 @@ module Vizkit
             p1 = OutputPortItem.new(port)
             p2 = OutputPortItem.new(port, item_type: :value)
 
-            appendRow([p1,p2])
+            appendRow([p1, p2])
+        end
 
-            if expanded?
-                p1.expand
-                p2.expand
-            end
+        def expanded
+            super
+
+            each_child(&:start)
         end
     end
 
@@ -711,16 +718,7 @@ module Vizkit
 
         def initialize(port,options = Hash.new)
             super
-            @listener = port.on_raw_data do |data|
-                # depending on the type we receive none typelip objects
-                # therefore if have to initialize it with a new sample
-                begin
-                    update port.new_sample.zero! unless typelib_val
-                    update data
-                rescue Orocos::NotFound
-                end
-            end
-            @listener.stop
+
             @stop_propagated = false
 
             if @options[:item_type] != :label
@@ -735,19 +733,26 @@ module Vizkit
             end
         end
 
-        def collapse(propagated = false)
-            @expanded = false
-            if @listener.listening?
-                @stop_propagated = propagated
-                @listener.stop
+        def stop
+            @listener&.stop
+        end
+
+        def start
+            @listener ||= create_listener
+            @listener.start
+        end
+
+        def create_listener
+            listener = port.on_raw_data do |data|
+                # depending on the type we receive none typelip objects
+                # therefore if have to initialize it with a new sample
+                update data.class.zero unless typelib_val
+                update data
             end
-        end
 
-        def expand(propagated = false)
-            @expanded = true
-            @listener.start if !propagated || @stop_propagated
+            listener.stop
+            listener
         end
-
     end
 
     class PropertyItem < TypelibItem
@@ -763,21 +768,6 @@ module Vizkit
             @options.merge! options
 
             @property = property
-            @listener = @property.on_raw_change do |data|
-                # depending on the type we receive none typelip objects
-                # therefore if have to initialize it with a new sample
-                begin
-                    unless typelib_val
-                        update property.new_sample.zero!
-                        setEditable @options[:editable] if @options[:item_type] != :label
-                    end
-                    update data if !modified?
-                rescue Orocos::NotFound
-                end
-            end
-            @listener.stop
-            @stop_propagated = false
-
             if @options[:item_type] != :label
                 @error_listener = property.on_error do |error|
                     @options[:text] = error.to_s
@@ -790,17 +780,30 @@ module Vizkit
             end
         end
 
-        def collapse(propagated = false)
-            @expanded = false
-            if @listener.listening?
-                @stop_propagated = propagated
-                @listener.stop
-            end
+        def start
+            @listener ||= create_listener
+            @listener.start
         end
 
-        def expand(propagated = false)
-            @expanded = true
-            @listener.start if !propagated || @stop_propagated
+        def stop
+            @listener&.stop
+        end
+
+        def create_listener
+            listener = @property.on_raw_change do |data|
+                # depending on the type we receive none typelip objects
+                # therefore if have to initialize it with a new sample
+                begin
+                    unless typelib_val
+                        update data.class.zero
+                        setEditable @options[:editable] if @options[:item_type] != :label
+                    end
+                    update data unless modified?
+                rescue Orocos::NotFound
+                end
+            end
+            listener.stop
+            listener
         end
 
         def context_menu(pos,parent_widget,items = [])
@@ -870,16 +873,18 @@ module Vizkit
                         prop1 = PropertyItem.new(prop,@options)
                         prop2 = PropertyItem.new(prop,:item_type => :value,:editable => @options[:editable])
                         appendRow [prop1,prop2]
-                        if expanded?
-                            prop1.expand
-                            prop2.expand
-                        end
                     end
                 end
             end
         end
 
         def context_menu(pos,parent_widget,items = [])
+        end
+
+        def expanded
+            super
+
+            each_child(&:start)
         end
 
         def data(role = Qt::UserRole+1)
@@ -897,13 +902,6 @@ module Vizkit
                           else
                               super
                           end
-        end
-
-        def expand(propagated = false)
-            @expanded = true
-            each_child do |item|
-                item.expand(propagated)
-            end
         end
 
         def write(&block)

@@ -36,14 +36,14 @@ module Vizkit
             raise ArgumentError,"wrong model type" unless model.is_a? Qt::AbstractItemModel
             super
             connect SIGNAL("collapsed(QModelIndex)") do |index|
-                item_from_index(index).collapse
+                item_from_index(index).collapsed
                 item = item_from_index(index.sibling(index.row,1))
-                item.collapse if item.is_a? VizkitItem
+                item.collapsed if item.is_a? VizkitItem
             end
             connect SIGNAL("expanded(QModelIndex)") do |index|
-                item_from_index(index).expand
+                item_from_index(index).expanded
                 item = item_from_index(index.sibling(index.row,1))
-                item.expand if item.is_a? VizkitItem
+                item.expanded if item.is_a? VizkitItem
             end
         end
 
@@ -51,7 +51,7 @@ module Vizkit
             @disconnected_items ||= []
         end
 
-        # stops all listeners 
+        # stops all listeners
         # this should be called if the tree view is no longer visible
         #
         # warning: if the tree view is still visible it will reconnect
@@ -60,8 +60,9 @@ module Vizkit
             0.upto(real_model.rowCount-1) do |i|
                 index = real_model.index(i,0)
                 next unless isExpanded(model.is_a?(Qt::AbstractProxyModel) ? model.mapFromSource(index) : index)
-                real_model.item(i,0).collapse
-                real_model.item(i,1).collapse
+
+                real_model.item(i,0).collapsed
+                real_model.item(i,1).collapsed
                 disconnected_items << i
             end
         end
@@ -150,7 +151,7 @@ module Vizkit
         end
 
         def setModelData(editor,model,index)
-            # we cannot use user properties here 
+            # we cannot use user properties here
             # there is no way to define some on the ruby side
             if editor.respond_to? :getData
                 model.setData(index,Qt::Variant.new(editor.getData),Qt::EditRole)

@@ -11,14 +11,14 @@ class StructViewer
             installEventFilter(@filter)
             @filter.on_show do
                 0.upto(@model.rowCount-1) do |i|
-                    @model.item(i,0).listener.start
-                    @model.item(i,1).listener.start
+                    @model.item(i,0).start
+                    @model.item(i,1).start
                 end
             end
             @filter.on_hide do
                 0.upto(@model.rowCount-1) do |i|
-                    @model.item(i,0).listener.stop
-                    @model.item(i,1).listener.stop
+                    @model.item(i,0).stop
+                    @model.item(i,1).stop
                 end
             end
         end
@@ -41,9 +41,7 @@ class StructViewer
                           elsif port.input?
                               [Vizkit::InputPortItem.new(port,:full_name => true), Vizkit::IntputPortItem.new(port,:item_type => :value)]
                           end
-            @model.appendRow [port1,port2]
-            port1.expand
-            port2.expand
+            @model.appendRow [port1, port2]
             treeView.resizeColumnToContents 0
             treeView.resizeColumnToContents 1
             # data handling is done by the data model
