@@ -921,16 +921,17 @@ module Vizkit
 
             if item_type == :value
                 task.on_reachable do
-                    begin
-                        @model = task.to_async.model
-                        setText @model.name
-                    rescue
+                    task.model do |m|
+                        @model = m
+                        self.text = m.name
                     end
                 end
             elsif item_type == :label
-                setText "TaskModel"
+                self.text = "TaskModel"
             else
-                raise ArgumentError, "#{item_type} is not a valid value for the item_type option of #{self.class}. Expected either :label or :value"
+                raise ArgumentError,
+                      "#{item_type} is not a valid value for the item_type option "\
+                      "of #{self.class}. Expected either :label or :value"
             end
         end
     end
