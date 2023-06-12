@@ -643,27 +643,25 @@ module Vizkit
             @options.merge! options
             @sent_sample = nil
 
-            port.once_on_reachable do
-                begin
-                    update port.new_sample.zero!
-                    @sent_sample = port.new_sample.zero!
-                    setEditable @options[:editable] if @options[:item_type] != :label
-                rescue ArgumentError => e
-                    if e.message =~ /null type/
-                        setForeground(ErrorBrush)
-                        if @options[:item_type] != :label
-                            @options[:text] = "Mismatching type definition for #{port.type.name}"
-                        end
-                    else
-                        raise
-                    end
-                rescue Orocos::TypekitTypeNotFound
+            begin
+                @sent_sample = port.new_sample.zero!
+                update @sent_sample
+                setEditable options[:editable]
+            rescue ArgumentError => e
+                if e.message =~ /null type/
                     setForeground(ErrorBrush)
                     if @options[:item_type] != :label
-                        @options[:text] = "No typekit for: #{port.type.name}"
+                        @options[:text] = "Mismatching type definition for #{port.type.name}"
                     end
-                rescue Orocos::NotFound # port died before we actually accessed it
+                else
+                    raise
                 end
+            rescue Orocos::TypekitTypeNotFound
+                setForeground(ErrorBrush)
+                if @options[:item_type] != :label
+                    @options[:text] = "No typekit for: #{port.type.name}"
+                end
+            rescue Orocos::NotFound # port died before we actually accessed it
             end
         end
 
