@@ -478,9 +478,16 @@ module Vizkit
 
     class PortItem < TypelibItem
         attr_reader :port
+
         def initialize(port,options = Hash.new)
-            options,other_options = Kernel.filter_options options,:item_type => :label,:full_name => false
+            options, other_options = Kernel.filter_options(
+                options, item_type: :label, full_name: false, buddy: nil, listen: false
+            )
+
+            @buddy = options[:buddy]
+            @listen = options[:listen]
             other_options[:item_type] = options[:item_type]
+
             if options[:item_type] == :label
                 other_options[:text] = if options[:full_name]
                                            port.full_name
@@ -489,7 +496,7 @@ module Vizkit
                                        end
             end
             @port = port
-            super(nil,other_options)
+            super(nil, other_options)
         end
     end
 
@@ -542,10 +549,10 @@ module Vizkit
         def on_port_reachable(port)
             return unless port.output?
 
-            p1 = OutputPortItem.new(port)
-            p2 = OutputPortItem.new(port, item_type: :value)
+            value = OutputPortItem.new(port, listen: false, item_type: :value)
+            label = OutputPortItem.new(port, listen: true, buddy: value)
 
-            appendRow([p1, p2])
+            appendRow([label, value])
         end
 
         def expanded
@@ -714,10 +721,8 @@ module Vizkit
         include PortItemUserInteraction
         attr_reader :listener
 
-        def initialize(port,options = Hash.new)
+        def initialize(port, options = Hash.new)
             super
-
-            @stop_propagated = false
 
             if @options[:item_type] != :label
                 @error_listener = port.on_error do |error|
@@ -736,20 +741,27 @@ module Vizkit
         end
 
         def start
+            return unless @listen
+
             @listener ||= create_listener
             @listener.start
         end
 
         def create_listener
             listener = port.on_raw_data do |data|
-                # depending on the type we receive none typelip objects
-                # therefore if have to initialize it with a new sample
-                update data.class.zero unless typelib_val
-                update data
+                process_raw_data(data)
+                @buddy&.process_raw_data(data)
             end
 
             listener.stop
             listener
+        end
+
+        def process_raw_data(data)
+            # depending on the type we receive none typelip objects
+            # therefore if have to initialize it with a new sample
+            update data.class.zero unless typelib_val
+            update data
         end
     end
 
@@ -761,9 +773,12 @@ module Vizkit
             options[:item_type] ||= :label
             options[:editable] = true unless options.has_key?(:editable)
             options[:text] = property.name if options[:item_type] == :label
-            options,other_options = Kernel.filter_options options,:accept => true
+            options,other_options = Kernel.filter_options options, buddy: nil, listen: false, accept: true
             super(nil,other_options)
             @options.merge! options
+
+            @buddy = options[:buddy]
+            @listen = options[:listen]
 
             @property = property
             if @options[:item_type] != :label
@@ -779,6 +794,8 @@ module Vizkit
         end
 
         def start
+            return unless @listen
+
             @listener ||= create_listener
             @listener.start
         end
@@ -789,19 +806,19 @@ module Vizkit
 
         def create_listener
             listener = @property.on_raw_change do |data|
-                # depending on the type we receive none typelip objects
-                # therefore if have to initialize it with a new sample
-                begin
-                    unless typelib_val
-                        update data.class.zero
-                        setEditable @options[:editable] if @options[:item_type] != :label
-                    end
-                    update data unless modified?
-                rescue Orocos::NotFound
-                end
+                process_raw_data(data)
+                @buddy&.process_raw_data(data)
             end
             listener.stop
             listener
+        end
+
+        def process_raw_data(data)
+            unless typelib_val
+                update data.class.zero
+                setEditable @options[:editable] if @options[:item_type] != :label
+            end
+            update data unless modified?
         end
 
         def context_menu(pos,parent_widget,items = [])
@@ -868,9 +885,9 @@ module Vizkit
                     next if child?(property_name)
                     prop = task.property(property_name)
                     prop.once_on_reachable do
-                        prop1 = PropertyItem.new(prop,@options)
-                        prop2 = PropertyItem.new(prop,:item_type => :value,:editable => @options[:editable])
-                        appendRow [prop1,prop2]
+                        value = PropertyItem.new(prop, listen: false, item_type: :value, editable: @options[:editable])
+                        label = PropertyItem.new(prop, @options.merge(listen: true, buddy: value))
+                        appendRow [label, value]
                     end
                 end
             end
