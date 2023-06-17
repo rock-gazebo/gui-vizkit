@@ -517,13 +517,10 @@ module Vizkit
 
         def discover_ports(task)
             task.on_port_reachable do |port_name|
-                puts "ON PORT REACHABLE #{port_name}"
                 next if child?(port_name)
 
                 port = task.port(port_name)
                 port.once_on_reachable do
-                    puts "P: #{port.object_id}"
-                    puts "self: #{object_id}"
                     on_port_reachable(port) unless child?(port_name)
                 end
                 port.on_error do |e|
