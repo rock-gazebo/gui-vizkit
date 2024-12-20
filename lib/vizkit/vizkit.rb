@@ -132,10 +132,12 @@ module Vizkit
             return false
         end
     end
-    def self.exec(async_period: 0.01)
-        #install event filter
-        obj = ShortCutFilter.new
-        $qApp.installEventFilter(obj)
+    def self.exec(async_period: 0.01, global_shortcuts: true)
+        if global_shortcuts
+            #install event filter
+            obj = ShortCutFilter.new
+            $qApp.installEventFilter(obj)
+        end
 
         timer = Qt::Timer.new
         timer.connect SIGNAL("timeout()") do
