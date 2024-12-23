@@ -347,6 +347,16 @@ Vizkit::UiLoader::extend_cplusplus_widget_class "Plot2d" do
     # @param [String] name the name of the graph. It is created if needed
     # @param [Time] time the sample time
     def update(sample, name, time: self.time)
+        sample =
+            case sample
+            when TrueClass
+                1
+            when FalseClass
+                0
+            else
+                sample
+            end
+
         graph = graph2(name)
         @time ||= time
         x = time-@time
