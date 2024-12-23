@@ -248,4 +248,20 @@ module Vizkit
     def self.connection_manager
         @connection_manager ||= Vizkit::ConnectionManager.new($qApp)
     end
+
+    # Compute a time relative to a
+    #
+    # All Vizkit-related parts that want to display a time relative to a base time
+    # should use this method, to ensure that they all agree on the base time
+    def self.make_time_relative(time)
+        @base_time ||= time
+        time - @base_time
+    end
+
+    # Reset the base time used by {.make_time_relative}
+    #
+    # The new time will be the next time given to {.make_time_relative}
+    def self.reset_base_time
+        @base_time = nil
+    end
 end
