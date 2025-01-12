@@ -543,6 +543,13 @@ module Vizkit
                 p2.expand
             end
         end
+
+        def expand(propagated = false)
+            @expanded = true
+            each_child do |item|
+                item.expand(propagated)
+            end
+        end
     end
 
     class InputPortsItem < PortsItem
