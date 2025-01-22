@@ -73,18 +73,19 @@ class TaskInspector
             menubar.hide
         end
 
-        def add_task(task,options=Hash.new)
-            obj = if task.is_a? String
+        def add_task(task, _options = {})
+            obj = if task.respond_to?(:to_str)
                       Orocos::Async.proxy task
-                  elsif task.is_a? Orocos::Async::TaskContextProxy
-                      task
+                  elsif task.respond_to?(:to_proxy)
+                      task.to_proxy
                   else
                       Orocos::Async.proxy task.name
                   end
+
             item1 = Vizkit::TaskContextItem.new obj
-            item2 = Vizkit::TaskContextItem.new obj,:item_type => :value
+            item2 = Vizkit::TaskContextItem.new obj, item_type: :value
             treeView.disconnected_items.clear
-            @model.appendRow([item1,item2])
+            @model.appendRow([item1, item2])
         end
 
         def remove_task(task)
